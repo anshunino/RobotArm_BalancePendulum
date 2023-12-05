@@ -247,10 +247,10 @@
   <joint name="ee_pendulum_joint" type="revolute">
     <parent link="ee_link"/>
     <child link="pendulum_link"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-    <axis xyz="1 0 0"/>
+    <origin rpy="0.0 0.0 1.51" xyz="0.0 0.0 0.0"/>
+    <axis xyz="0 1 0"/>
     <dynamics damping="0.0" friction="0.0"/>
-    <limit effort="150.0" lower="-6.28318530718" upper="6.28318530718" velocity="3.15"/>
+    <limit effort="150.0" lower="-20" upper="20" velocity="3.15"/>
   </joint>
   <link name="pendulum_link">
     <inertial>
@@ -283,7 +283,7 @@
   </joint>
   <link name="mass_link">
   <inertial>
-    <mass value="0.05" />
+    <mass value="5" />
     <origin xyz="0.25 0 0" rpy="0 0 0" />
     <inertia  ixx="0.001" ixy="0.0" ixz="0.0"
               iyy="0.001" iyz="0.0"
