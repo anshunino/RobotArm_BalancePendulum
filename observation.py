@@ -13,6 +13,7 @@ class Actor():
         self.INITIAL_CONF = [-0.07195958737978714, -0.031165154579558596, -
                              1.804251465569389, -1.4883759445410973, 0.11663409459107088]
 
+        '''
         episode, ee_positions_x, ee_positions_y, ee_positions_z = self.rollout(
             self.pid_policy, dt=0.01)
         # print('Actions: ', episode['action'], '\n\n')
@@ -44,7 +45,7 @@ class Actor():
         plt.plot(ee_positions_z, label='ee_positions_z')
         plt.legend()
         plt.savefig('EE_positions.png')
-        plt.close()
+        plt.close()'''
 
     def getObservation(self, robot, link_ids=np.linspace(0, 11, 12, dtype=int), init_pos=np.array([0.36328751177246044, 0.16626388143593868, 0.5289256634238204])):
         '''
@@ -77,9 +78,9 @@ class Actor():
         x_t1 = x_t + v_t*dt + 0.5*a_t*dt*dt
         return (x_t1, v_t1)
 
-    def getNextStep(self, robot, observation_t, policy, dt):
+    def getNextStep(self, robot, observation_t, policy, dt, replay_buffer):
         x_t, theta_t, v_t, w_t = observation_t
-        a_t = policy(observation_t)
+        a_t = policy(observation_t, replay_buffer, dt)
 
         dx = v_t*dt + 0.5*a_t*dt*dt
 
@@ -92,9 +93,12 @@ class Actor():
 
         tgt_jnt_poss = self.compute_inverse_kinematics(
             robot, np.array(pos)+dx*np.array([1, 0, 0]).flatten().tolist(), quat)
-        pybullet.setJointMotorControlArray(
-            robot, self.free_joints, pybullet.POSITION_CONTROL, targetPositions=tgt_jnt_poss)
-        pybullet.stepSimulation()
+        for i in range(4):
+            self.set_jpos(tgt_jnt_poss, robot, dt/4)
+            # pybullet.setJointMotorControlArray(
+            #    robot, self.free_joints, pybullet.POSITION_CONTROL, targetPositions=tgt_jnt_poss)
+            # pybullet.stepSimulation()
+        pybullet.setTimeStep(dt)
         time.sleep(dt)
 
         observation_t1 = [x_t1[0], theta_t1, v_t1[0], w_t1]
@@ -115,14 +119,14 @@ class Actor():
     def getTerminationState(self, observation):
         x, theta, _, _ = observation
         terminated = bool(
-            x < -4.8
-            or x > 4.8)
-        #    or theta < -0.20944
-        #    or theta > 0.20944
-        # )
+            x < -2.4
+            or x > 2.4
+            or theta < -0.20944
+            or theta > 0.20944
+        )
         return terminated
 
-    def pid_policy(self, observation):
+    def pid_policy(self, observation, replay_buffer, dt):
         '''
         Calculates the PID control to determine the action for the next step
         Args:
@@ -133,19 +137,20 @@ class Actor():
         o = np.array([0., 0., 0., 0.])
         # d_t = 0.02
 
-        K_p = 100*np.array([0.1, 2., 0.01, 0.01])
-        # K_d = 0.01*np.array([1., 1., .000001, 1e-7])
-        # K_i = 0.0002*np.array([0.1, 0.5, 0, 0])
+        K_p = 500*np.array([0.4, 8., 0.01, 0.005])
+        K_d = 10.*np.sqrt(K_p)  # 0.1*np.array([1., 10., .000001, 1e-7])
+        K_i = 0.0002*np.array([0.1, 0.5, 0, 0])
         e_k = np.array(observation) - o
-        # if len(episode)>1:
-        #  d_e_k = (observation - episode[-4])/d_t
-        # else:
-        #  d_e_k = np.zeros(4)
-        # i_e_k = np.sum(np.array(episode[::3]), axis=0) * d_t
+        if len(replay_buffer) > 0:
+            d_e_k = (observation - replay_buffer[-1])/dt
+        else:
+            d_e_k = np.zeros(4)
+        i_e_k = np.sum(np.array(replay_buffer), axis=0) * dt
+        # print(e_k, d_e_k)
 
         # print(K_d, d_e_k, np.dot(K_d, d_e_k))
         # + np.dot(K_d, d_e_k) + np.dot(K_i, i_e_k)   # u = -Kx
-        a = -1.*np.dot(K_p, e_k)
+        a = -1.*np.dot(K_p, e_k) - np.dot(K_d, d_e_k) - np.dot(K_i, i_e_k)
 
         def sigmoid(x):
             return 1.0 / (1.0 + np.exp(-x))
@@ -156,8 +161,15 @@ class Actor():
 
         return np.array([a])
 
-    def rollout_from_env(self, robot, policy, dt):
-        episode = {'action': [0], 'reward': [0], 'observation': []}
+    def sin_policy(self, observation, replay_buffer, dt):
+        o = np.array([0., 0., 0., 0.])
+        e_k = observation - o
+        # -50.*e_k[0]  # **2-80.*observation[1]
+        a = -150*np.tan(e_k[1]) - 50.*e_k[1] - 5.*e_k[0]
+        return np.array([a])
+
+    def rollout_from_env(self, robot, policy, dt, replay_size=4):
+        episode = {'action': [], 'reward': [], 'observation': []}
         observation = [0.0, self.getObservation(robot)[1], 0.0, 0.0]
 
         ee_positions_x = []
@@ -165,9 +177,14 @@ class Actor():
         ee_positions_z = []
 
         episode['observation'].append(observation)
-        for step in range(1000):
+        for step in range(10000):
+            if len(episode['action']) < replay_size:
+                replay_buffer = np.array(episode['observation'])
+            else:
+                replay_buffer = np.array(episode['observation'][-replay_size:])
+
             action, observation, reward, terminated = self.getNextStep(
-                robot, observation, policy, dt)  # robot.step(action)
+                robot, observation, policy, dt, replay_buffer)  # robot.step(action)
             episode['action'].append(action[0])
             episode['reward'].append(reward)
             episode['observation'].append(observation)
@@ -203,7 +220,7 @@ class Actor():
         for i in range(100):
             self.set_jpos(self.INITIAL_CONF, robot, timeStep)
 
-        timeStep = 1./300
+        timeStep = 1./3000
         pybullet.setTimeStep(timeStep)
         episode, ee_positions_x, ee_positions_y, ee_positions_z = self.rollout_from_env(
             robot, policy, timeStep)
@@ -240,6 +257,7 @@ class Actor():
         return ori
 
     def set_jpos(self, position, robot, timeStep):
+        pybullet.setTimeStep(timeStep)
         position = position.copy()
         tgt_pos = position
         pybullet.setJointMotorControlArray(
@@ -249,4 +267,36 @@ class Actor():
         time.sleep(timeStep)
 
 
-Actor()
+actor = Actor()
+episode, ee_positions_x, ee_positions_y, ee_positions_z = actor.rollout(
+    actor.sin_policy, dt=0.01)
+
+plt.plot(np.array(episode['observation'])[:, 0], label='Position')
+plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
+plt.legend()
+plt.xlabel('Steps')
+plt.savefig('obs_order1.png')
+plt.close()
+
+plt.plot(np.array(episode['observation'])[:, 0], label='Position')
+plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
+plt.plot(np.array(episode['observation'])[:, 2], label='Velocity')
+plt.plot(np.array(episode['observation'])[:, 3], label='Angular Velocity')
+plt.xlabel('Steps')
+plt.legend()
+plt.savefig('obs.png')
+plt.close()
+
+plt.plot(episode['action'], label='actions')
+plt.xlabel('Steps')
+plt.legend()
+plt.savefig('actions.png')
+plt.close()
+
+plt.plot(ee_positions_x, label='ee_positions_x')
+plt.plot(ee_positions_y, label='ee_positions_y')
+plt.plot(ee_positions_z, label='ee_positions_z')
+plt.xlabel('Steps')
+plt.legend()
+plt.savefig('EE_positions.png')
+plt.close()
