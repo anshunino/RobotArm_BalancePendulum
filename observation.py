@@ -8,44 +8,10 @@ import time
 class Actor():
 
     def __init__(self):
-        self.free_joints = [1, 2, 3, 4, 5]
+        self.free_joints = [1, 2, 3, 4, 5, 6]
         self.ee_link_id = 7
-        self.INITIAL_CONF = [-0.07195958737978714, -0.031165154579558596, -
-                             1.804251465569389, -1.4883759445410973, 0.11663409459107088]
-
-        '''
-        episode, ee_positions_x, ee_positions_y, ee_positions_z = self.rollout(
-            self.pid_policy, dt=0.01)
-        # print('Actions: ', episode['action'], '\n\n')
-        # print('Rewards: ', episode['reward'], '\n\n')
-        # print('Observations: ', episode['observation'], '\n\n')
-        # print('Num steps: ', len(episode['action']))
-        plt.plot(np.array(episode['observation'])[:, 0], label='x')
-        plt.plot(np.array(episode['observation'])[:, 1], label='theta')
-        plt.plot(episode['action'], label='actions')
-        plt.legend()
-        plt.savefig('response.png')
-        plt.close()
-
-        plt.plot(np.array(episode['observation'])[:, 0], label='x')
-        plt.plot(np.array(episode['observation'])[:, 1], label='theta')
-        plt.plot(np.array(episode['observation'])[:, 2], label='v')
-        plt.plot(np.array(episode['observation'])[:, 3], label='w')
-        plt.legend()
-        plt.savefig('obs.png')
-        plt.close()
-
-        plt.plot(episode['action'], label='actions')
-        plt.legend()
-        plt.savefig('actions.png')
-        plt.close()
-
-        plt.plot(ee_positions_x, label='ee_positions_x')
-        plt.plot(ee_positions_y, label='ee_positions_y')
-        plt.plot(ee_positions_z, label='ee_positions_z')
-        plt.legend()
-        plt.savefig('EE_positions.png')
-        plt.close()'''
+        self.INITIAL_CONF = [-0.07195958737978714, -0.031165154579558596, -1.804251465569389, 
+                             -1.4883759445410973, 0.11663409459107088, 2.914561838332981]
 
     def getObservation(self, robot, link_ids=np.linspace(0, 11, 12, dtype=int), init_pos=np.array([0.36328751177246044, 0.16626388143593868, 0.5289256634238204])):
         '''
@@ -267,36 +233,37 @@ class Actor():
         time.sleep(timeStep)
 
 
-actor = Actor()
-episode, ee_positions_x, ee_positions_y, ee_positions_z = actor.rollout(
-    actor.sin_policy, dt=0.01)
-
-plt.plot(np.array(episode['observation'])[:, 0], label='Position')
-plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
-plt.legend()
-plt.xlabel('Steps')
-plt.savefig('obs_order1.png')
-plt.close()
-
-plt.plot(np.array(episode['observation'])[:, 0], label='Position')
-plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
-plt.plot(np.array(episode['observation'])[:, 2], label='Velocity')
-plt.plot(np.array(episode['observation'])[:, 3], label='Angular Velocity')
-plt.xlabel('Steps')
-plt.legend()
-plt.savefig('obs.png')
-plt.close()
-
-plt.plot(episode['action'], label='actions')
-plt.xlabel('Steps')
-plt.legend()
-plt.savefig('actions.png')
-plt.close()
-
-plt.plot(ee_positions_x, label='ee_positions_x')
-plt.plot(ee_positions_y, label='ee_positions_y')
-plt.plot(ee_positions_z, label='ee_positions_z')
-plt.xlabel('Steps')
-plt.legend()
-plt.savefig('EE_positions.png')
-plt.close()
+if __name__ == '__main__':
+    actor = Actor()
+    episode, ee_positions_x, ee_positions_y, ee_positions_z = actor.rollout(
+        actor.sin_policy, dt=0.01)
+    
+    plt.plot(np.array(episode['observation'])[:, 0], label='Position')
+    plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
+    plt.legend()
+    plt.xlabel('Steps')
+    plt.savefig('obs_order1.png')
+    plt.close()
+    
+    plt.plot(np.array(episode['observation'])[:, 0], label='Position')
+    plt.plot(np.array(episode['observation'])[:, 1], label='Vertical Angle')
+    plt.plot(np.array(episode['observation'])[:, 2], label='Velocity')
+    plt.plot(np.array(episode['observation'])[:, 3], label='Angular Velocity')
+    plt.xlabel('Steps')
+    plt.legend()
+    plt.savefig('obs.png')
+    plt.close()
+    
+    plt.plot(episode['action'], label='actions')
+    plt.xlabel('Steps')
+    plt.legend()
+    plt.savefig('actions.png')
+    plt.close()
+    
+    plt.plot(ee_positions_x, label='ee_positions_x')
+    plt.plot(ee_positions_y, label='ee_positions_y')
+    plt.plot(ee_positions_z, label='ee_positions_z')
+    plt.xlabel('Steps')
+    plt.legend()
+    plt.savefig('EE_positions.png')
+    plt.close()
